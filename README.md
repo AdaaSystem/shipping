@@ -118,7 +118,9 @@ $eligible = app(\Adaa\Shipping\Registry\CarrierRegistry::class)->eligibleForOrig
 | Mylerz | مصر/MENA | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | SMSA | السعودية/الخليج | مباشر SOAP (raw-XML) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جاهز (بدون `ext-soap`) |
 | Aramex | MENA/عالمي | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (أصلي: SOAP خام بلا `ext-soap` + أسعار `CalculateRate`) |
-| DHL / FedEx / UPS | عالمي | مباشر REST | ✅ | ✅ | ✅ | — | — | مخطط (SDKs ناضجة لكل منها) |
+| DHL Express | عالمي | مباشر REST (MyDHL spec 3.3.1، Basic Auth) | ✅ | ✅ | — (الملصق داخل رد الإنشاء فقط) | — | — | ✅ جاهز (أسعار `GET/POST /rates` + إنشاء + تتبع) |
+| FedEx | عالمي | مباشر REST (OAuth2 + Ship/Rate/Track) | ✅ | ✅ | ✅ (بايتات `encodedLabel` المحفوظة، وإلا رابط التتبع) | ✅ | ✅ | ✅ جاهز (يحفظ بايتات الملصق — يصلح فجوة `shipbridge-fedex`) |
+| UPS | عالمي | مباشر REST (OAuth2) | ✅ | ✅ | ✅ (بايتات `GraphicImage` عبر recovery) | — | ✅ | ✅ (أسعار `Shop` + إلغاء `void` + COD) |
 | Egypt Post | مصر | **تتبع فقط** | ❌ | ✅ | — (رابط التتبع العام) | — | — | ✅ تتبع فقط (لا API إنشاء عمومية) |
 | Fake | الاختبارات | محلي | ✅ | ✅ | ✅ | — | ✅ | ✅ جاهز |
 
@@ -144,7 +146,8 @@ composer run analyse   # PHPStan
 - [ ] سائق Bosta + اختباراته
 - [x] سائق Aramex (SOAP خام: `CreateShipments`/`TrackShipments`/`PrintLabel`/`CalculateRate`، بلا `ext-soap`)
 - [ ] سائقو Mylerz / SMSA
-- [ ] DHL / FedEx / UPS + تتبع Egypt Post
+- [x] سائق UPS (REST + OAuth2: `ship`/`rating-Shop`/`track`/`label-recovery`/`void` + COD)
+- [ ] DHL / FedEx + تتبع Egypt Post
 - [ ] Jobs + webhooks موقعة + أوامر Artisan للتشخيص
 - [ ] حزمة Filament + أول إصدار موسوم `v0.1.0`
 

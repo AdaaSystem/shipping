@@ -52,6 +52,35 @@ return [
             'return' => true, 'exchange' => true, 'cod' => true,
         ],
     ],
+    'fedex' => [
+        'name' => 'FedEx',
+        'region' => 'Global',
+        'type' => 'direct',
+        'origin_countries' => ['*'],
+        'capabilities' => [
+            'rates' => true, 'create' => true, 'label' => true, 'track' => true,
+            'return' => true, 'exchange' => true, 'cod' => true,
+        ],
+    ],
+    'dhl' => [
+        'name' => 'DHL Express',
+        'region' => 'Global',
+        'type' => 'direct',
+        'origin_countries' => ['*'],
+        'capabilities' => [
+            'rates' => true, 'create' => true, 'track' => true,
+        ],
+    ],
+    'ups' => [
+        'name' => 'UPS',
+        'region' => 'Global',
+        'type' => 'direct',
+        'origin_countries' => ['*'],
+        'capabilities' => [
+            'rates' => true, 'create' => true, 'label' => true, 'track' => true,
+            'cancel' => true, 'cod' => true,
+        ],
+    ],
     'egyptpost' => [
         'name' => 'Egypt Post',
         'region' => 'Egypt',
