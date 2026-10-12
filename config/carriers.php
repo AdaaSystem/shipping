@@ -48,8 +48,8 @@ return [
         'type' => 'direct',
         'origin_countries' => ['*'],
         'capabilities' => [
-            'create' => true, 'label' => true, 'track' => true,
-            'cancel' => true, 'return' => true, 'exchange' => true, 'cod' => true,
+            'rates' => true, 'create' => true, 'label' => true, 'track' => true,
+            'return' => true, 'exchange' => true, 'cod' => true,
         ],
     ],
     'egyptpost' => [

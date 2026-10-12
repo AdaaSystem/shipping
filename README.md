@@ -115,11 +115,11 @@ $eligible = app(\Adaa\Shipping\Registry\CarrierRegistry::class)->eligibleForOrig
 | الشركة | المنطقة | النوع | create | track | label | return/exchange | COD | الحالة |
 |---|---|---|---|---|---|---|---|---|
 | Bosta | مصر | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Mylerz | مصر/MENA | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط (عبر `shipbridge-mylerz` — لا بديل PHP له) |
-| SMSA | السعودية/الخليج | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط |
-| Aramex | MENA/عالمي | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط (عبر `octw/aramex` الأنضج) |
+| Mylerz | مصر/MENA | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SMSA | السعودية/الخليج | مباشر SOAP (raw-XML) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جاهز (بدون `ext-soap`) |
+| Aramex | MENA/عالمي | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (أصلي: SOAP خام بلا `ext-soap` + أسعار `CalculateRate`) |
 | DHL / FedEx / UPS | عالمي | مباشر REST | ✅ | ✅ | ✅ | — | — | مخطط (SDKs ناضجة لكل منها) |
-| Egypt Post | مصر | **تتبع فقط** | ❌ | ✅ | — | — | — | مخطط (لا API إنشاء عمومية) |
+| Egypt Post | مصر | **تتبع فقط** | ❌ | ✅ | — (رابط التتبع العام) | — | — | ✅ تتبع فقط (لا API إنشاء عمومية) |
 | Fake | الاختبارات | محلي | ✅ | ✅ | ✅ | — | ✅ | ✅ جاهز |
 
 > إضافة شركة = سائق جديد + `extend()` — دون لمس النواة.
@@ -142,7 +142,8 @@ composer run analyse   # PHPStan
 
 - [x] النواة + `FakeDriver` + جسر Laravel + سجل الشركات
 - [ ] سائق Bosta + اختباراته
-- [ ] سائقو Mylerz / SMSA / Aramex
+- [x] سائق Aramex (SOAP خام: `CreateShipments`/`TrackShipments`/`PrintLabel`/`CalculateRate`، بلا `ext-soap`)
+- [ ] سائقو Mylerz / SMSA
 - [ ] DHL / FedEx / UPS + تتبع Egypt Post
 - [ ] Jobs + webhooks موقعة + أوامر Artisan للتشخيص
 - [ ] حزمة Filament + أول إصدار موسوم `v0.1.0`
