@@ -145,7 +145,23 @@ Coverage includes: status normalization, capability declarations, connection iso
 - [x] Core + `FakeDriver` + Laravel bridge + carrier registry
 - [x] Bosta, Mylerz, SMSA, Aramex, DHL, FedEx, UPS, J&T drivers + Egypt Post tracking
 - [ ] Jobs + signed webhooks + Artisan diagnostics in the Laravel bridge
-- [ ] Filament package resources polish + first tagged release `v0.1.0`
+- [x] Filament companion package + CI + automated releases (`v0.1.0`)
+
+## Releases & automatic updates
+
+New versions flow to every project automatically — no reinstall, no re-submit:
+
+1. **Maintainer tags a release:** `git tag v0.2.0 && git push --tags`
+2. **GitHub Action** (`.github/workflows/release.yml`) creates the GitHub Release with auto-generated notes.
+3. **Packagist syncs itself** via the GitHub integration (one-time setup below) — the new version appears within minutes.
+4. **Consumer projects** get it with a normal `composer update adaa/shipping` (or automatically via Dependabot/Renovate).
+
+One-time Packagist setup (do it once per package):
+
+1. Submit the repo (first time only): <https://packagist.org/packages/submit> — enter `https://github.com/AdaaSystem/shipping`.
+2. Enable auto-sync: open <https://packagist.org/profile>, authorize the **Packagist GitHub App** for the `AdaaSystem` organization. From then on every tag syncs without clicks (see <https://packagist.org/about#how-to-update-packages>).
+
+CI runs on every push/PR (PHP 8.3–8.5: `composer validate`, Pint, Pest) and Dependabot opens weekly dependency PRs.
 
 ## Contributing
 

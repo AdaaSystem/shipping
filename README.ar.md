@@ -144,7 +144,23 @@ composer run analyse   # PHPStan
 - [x] النواة + `FakeDriver` + جسر Laravel + سجل الشركات
 - [x] سائقو Bosta وMylerz وSMSA وAramex وDHL وFedEx وUPS وJ&T + تتبع Egypt Post
 - [ ] مهام الطوابير + webhooks موقعة + أوامر Artisan للتشخيص في جسر Laravel
-- [ ] صقل حزمة Filament + أول إصدار موسوم `v0.1.0`
+- [x] حزمة Filament المرافقة + CI + إصدارات آلية (`v0.1.0`)
+
+## الإصدارات والتحديث التلقائي
+
+تصل النسخ الجديدة لكل مشروع تلقائيًا — بلا إعادة تثبيت ولا إعادة تقديم:
+
+1. **المشرف يوسم إصدارًا:** `git tag v0.2.0 && git push --tags`
+2. **GitHub Action** (`.github/workflows/release.yml`) ينشئ GitHub Release بملاحظات مولدة تلقائيًا.
+3. **Packagist يزامن نفسه** عبر تكامل GitHub (إعداد لمرة واحدة بالأسفل) — تظهر النسخة خلال دقائق.
+4. **المشاريع المستهلكة** تحصل عليها بأمر `composer update adaa/shipping` عادي (أو تلقائيًا عبر Dependabot/Renovate).
+
+إعداد Packagist لمرة واحدة (مرة لكل حزمة):
+
+1. قدّم المستودع (أول مرة فقط): <https://packagist.org/packages/submit> — أدخل `https://github.com/AdaaSystem/shipping`.
+2. فعّل المزامنة التلقائية: افتح <https://packagist.org/profile> وخوّل **تطبيق Packagist على GitHub** لمنظمة `AdaaSystem`. بعدها يتزامن كل tag دون نقرات (انظر <https://packagist.org/about#how-to-update-packages>).
+
+يعمل CI مع كل push/PR (PHP 8.3–8.5: `composer validate` وPint وPest) ويفتح Dependabot طلبات تحديث أسبوعية.
 
 ## المساهمة
 
