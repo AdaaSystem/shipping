@@ -114,7 +114,7 @@ $eligible = app(\Adaa\Shipping\Registry\CarrierRegistry::class)->eligibleForOrig
 
 | الشركة | المنطقة | النوع | create | track | label | return/exchange | COD | الحالة |
 |---|---|---|---|---|---|---|---|---|
-| Bosta | مصر | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | قيد التنفيذ |
+| Bosta | مصر | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Mylerz | مصر/MENA | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط (عبر `shipbridge-mylerz` — لا بديل PHP له) |
 | SMSA | السعودية/الخليج | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط |
 | Aramex | MENA/عالمي | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | مخطط (عبر `octw/aramex` الأنضج) |
