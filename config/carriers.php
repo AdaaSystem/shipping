@@ -42,6 +42,16 @@ return [
             'return' => true, 'exchange' => true, 'cod' => true,
         ],
     ],
+    'jtexpress' => [
+        'name' => 'J&T Express',
+        'region' => 'Egypt',
+        'type' => 'direct',
+        'origin_countries' => ['EG'],
+        'capabilities' => [
+            'create' => true, 'label' => true, 'track' => true,
+            'cancel' => true, 'return' => true, 'exchange' => true, 'cod' => true,
+        ],
+    ],
     'aramex' => [
         'name' => 'Aramex',
         'region' => 'MENA / Global',

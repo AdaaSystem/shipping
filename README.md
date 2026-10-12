@@ -1,45 +1,41 @@
-# Adaa Shipping — مكتبة الشحن متعددة الشركات لـ PHP و Laravel
+# Adaa Shipping
 
-> **Multi-carrier shipping library for PHP with first-class Laravel support.**
-> صُممت لمنصات التجارة متعددة البائعين (Multi-vendor Marketplaces): كل متجر يربط **حسابه الخاص** لدى شركة الشحن، والمنصة تدير **حساباتها الخاصة** — دون تداخل أبدًا.
+> **English** | [العربية](README.ar.md)
 
----
+Framework-agnostic multi-carrier shipping library for PHP with first-class Laravel support — built for **multi-vendor marketplaces** where every merchant connects their **own** carrier account, alongside the platform's **own** accounts, with zero cross-contamination.
 
-## لماذا هذه المكتبة؟ | Why this package?
+## Why this package?
 
-معظم مكتبات الشحن تفترض **حسابًا واحدًا** لكل شركة (مفتاح API في `.env`). هذا يكسر نموذج السوق المفتوح حيث:
+Most shipping libraries assume **one account per carrier** (a single API key in `.env`). That breaks the marketplace model:
 
-- التاجر (أ) لديه عقد Bosta بمفتاحه، والتاجر (ب) لديه عقد Bosta بمفتاح **مختلف**،
-- والمنصة نفسها لديها حساب ثالث للشحن المدعوم.
+- Merchant A holds a Bosta contract with **their** key; merchant B holds a **different** Bosta contract;
+- The platform itself holds a third account for subsidized shipping.
 
-`adaa/shipping` تحل هذا عبر **سياق الاتصال** (`ShippingConnectionContext`): كل عملية شحن تُنفَّذ بسائق مبني **على بيانات اعتماد ذلك الاتصال تحديدًا** — لا إعدادات عمومية، لا مفاتيح مشتركة، لا تسرب بين التجار.
+`adaa/shipping` solves this with a **connection context** (`ShippingConnectionContext`): every shipment runs through a driver built from **that connection's own credentials** — no global config, no shared keys, no cross-merchant leaks.
 
-Most shipping libraries assume **one account per carrier** (an API key in `.env`). That breaks the marketplace model where merchant A and merchant B hold *different* contracts with the *same* carrier, plus a platform-owned account. This package resolves a driver **per connection**, from that connection's own credentials — no global config, no shared keys, no cross-merchant leaks.
+## Highlights
 
-## المزايا | Features
+- **Two connection modes** — `platform` (marketplace-owned accounts) and `merchant` (merchant-owned accounts), fully isolated.
+- **Opt-in capabilities** — each driver declares only what it truly supports (`rates`, `create`, `label`, `track`, `cancel`, `pickup`, `return`, `exchange`, `cod`, `webhooks`…). Tracking-only carriers are never offered for creation.
+- **Normalized statuses & errors** (`ShipmentStatus` + `StatusNormalizer`) while preserving the carrier's raw payload (`raw`) with secrets redacted.
+- **Framework-agnostic core** — works in any PHP project; Laravel bridge is optional; the Filament admin UI lives in a separate package (`adaa/shipping-filament`), so this library runs perfectly without Filament.
+- **Reliability built in** — idempotency keys, queued dispatch, per-connection signed webhooks, and an audit trail.
 
-- **نموذج الحسابين:** `platform` (حسابات المنصة) و `merchant` (حسابات التجار) مع عزل كامل.
-- **قدرات اختيارية:** كل سائق يعلن ما يدعمه فعلًا (`rates`, `create`, `label`, `track`, `cancel`, `pickup`, `return`, `exchange`, `cod`, `webhooks`…) — لا تُجبر شركة على عمليات وهمية، وشركات التتبع فقط لا تُعرض للإنشاء أبدًا.
-- **توحيد الحالات والأخطاء** (`ShipmentStatus` + `StatusNormalizer`) مع الاحتفاظ برد الناقل الخام (`raw`) بعد تنقية الأسرار.
-- **نواة framework-agnostic:** تعمل في أي مشروع PHP؛ تكامل Laravel اختياري؛ واجهة Filament في حزمة منفصلة (`adaa/shipping-filament`) — المكتبة تعمل بدونهما طبيعيًا.
-- **موثوقية:** مفاتيح idempotency، طوابير، webhooks موقعة لكل اتصال، وسجل تدقيق.
-
-## المتطلبات | Requirements
+## Requirements
 
 - PHP `^8.3`
-- `illuminate/contracts`, `illuminate/support`, `illuminate/http` (`^10.0|^11.0|^12.0|^13.0`) — للنواة فقط عميل HTTP قابل للحقن، بلا Facades خارج طبقة Laravel.
+- `illuminate/contracts`, `illuminate/support`, `illuminate/http` (`^10.0|^11.0|^12.0|^13.0`) — the core only needs an injectable HTTP client; no facades outside the Laravel bridge.
 
-## التثبيت | Installation
+## Installation
 
 ```bash
 composer require adaa/shipping
 ```
 
-## البدء السريع (PHP عادي) | Quick start (plain PHP)
+## Quick start (plain PHP)
 
 ```php
 use Adaa\Shipping\Connection\ShippingConnectionContext;
-use Adaa\Shipping\Drivers\FakeDriver;
 use Adaa\Shipping\DTOs\Address;
 use Adaa\Shipping\DTOs\Parcel;
 use Adaa\Shipping\DTOs\ShipmentDraft;
@@ -49,19 +45,17 @@ use Adaa\Shipping\Manager\ShippingManager;
 
 $manager = new ShippingManager();
 
-// سجّل سائقًا: المصنع يستقبل سياق الاتصال فيُبنى السائق بمفاتيحه.
-$manager->extend('bosta', fn (ShippingConnectionContext $c) => new BostaDriver(
-    new BostaClient($http, $c->credentials + ['environment' => $c->environment->value]),
-    ...
-));
+// Register a driver: the factory receives the connection context,
+// so the driver is always built with that connection's credentials.
+$manager->extend('bosta', fn (ShippingConnectionContext $c) => BostaDriver::fromConnection($http, $c));
 
-// اتصال تاجر — لا يرى غيره ولا يشاركه أحد.
+// One merchant's connection — invisible to, and unshared with, everyone else.
 $connection = new ShippingConnectionContext(
     connectionId: 'conn_42',
     carrierCode: 'bosta',
     mode: ConnectionMode::Merchant,
     environment: Environment::Production,
-    credentials: ['api_key' => '...'],   // بالذاكرة فقط — لا تُسجَّل ولا تُعرض أبدًا
+    credentials: ['api_key' => '...'],   // in-memory only — never logged or returned
     merchantId: 'merchant_7',
 );
 
@@ -74,91 +68,93 @@ $shipment = $manager->driverFor($connection)->createShipment(new ShipmentDraft(
     idempotencyKey: 'ord-1001-bosta',
 ));
 
-echo $shipment->trackingNumber; // رقم التتبع
+echo $shipment->trackingNumber;
 ```
 
-## داخل Laravel | Laravel integration
+## Laravel integration
 
 ```bash
 php artisan vendor:publish --tag=shipping-config
 ```
 
 ```php
-// config/shipping.php — بنية فقط، الأسرار في قاعدة البيانات مشفرة لكل اتصال.
 use Adaa\Shipping\Manager\ShippingManager;
 
-$manager = app(ShippingManager::class);
-$result = $manager->driverFor($connection)->createShipment($draft);
+$result = app(ShippingManager::class)->driverFor($connection)->createShipment($draft);
 ```
 
-نموذج البيانات المقترح (انشر migrations الخاصة بك أو استخدم حزمتك):
+Suggested schema (publish your own migrations or bring your models):
 
-| الجدول | الدور |
+| Table | Role |
 |---|---|
-| `shipping_connections` | اتصال واحد = (`merchant_id` فارغ للمنصة، `carrier_code`، `credentials` مشفرة، `environment`، `status`…) |
-| `shipping_shipments` | شحنة = (`order_id`، `connection_id`، `tracking_number`، `idempotency_key` فريد، الحالة الموحدة…) |
-| `shipping_events` | سجل تدقيق لكل انتقال حالة |
+| `shipping_connections` | One row per connection: nullable `merchant_id` (NULL = platform), `carrier_code`, **encrypted** `credentials`, `environment`, `status`, … |
+| `shipping_shipments` | One row per shipment: `order_id`, `connection_id`, `tracking_number`, unique `idempotency_key`, normalized status, … |
+| `shipping_events` | Audit trail for every status transition. |
 
-> ⚠️ قاعدة ذهبية: لا تضع مفاتيح النواقل في `.env` عند تعدد التجار — كل اتصال يحمل مفاتيحه مشفرة في قاعدة البيانات.
+> Golden rule: with multiple merchants, never put carrier keys in `.env` — each connection carries its own encrypted credentials in the database.
 
-## كيف تختار الشركة للتاجر؟ | Carrier eligibility
+## Carrier eligibility
 
-لا تُستخدم دولة التاجر وحدها. يجمع `CarrierRegistry` (بيانات ثابتة: دول الإرسال والخدمات) مع اتصالات التاجر النشطة وقدرات كل اتصال:
+Never use the merchant's country alone. `CarrierRegistry` (static metadata: origin countries, services) is combined at runtime with the merchant's active connections and each connection's capabilities:
 
 ```php
 $eligible = app(\Adaa\Shipping\Registry\CarrierRegistry::class)->eligibleForOrigin('EG');
-// ['aramex', 'bosta', 'egyptpost', 'fake', 'mylerz'] — ثم تُصفَّى بالاتصالات النشطة والقدرات.
+// e.g. ['aramex', 'bosta', 'egyptpost', 'fake', 'mylerz'] — then filtered by active connections + capabilities.
 ```
 
-## السائقون | Drivers
+## Drivers
 
-| الشركة | المنطقة | النوع | create | track | label | return/exchange | COD | الحالة |
+| Carrier | Region | Type | create | track | label | return/exchange | COD | Status |
 |---|---|---|---|---|---|---|---|---|
-| Bosta | مصر | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Mylerz | مصر/MENA | مباشر | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SMSA | السعودية/الخليج | مباشر SOAP (raw-XML) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جاهز (بدون `ext-soap`) |
-| Aramex | MENA/عالمي | مباشر SOAP | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (أصلي: SOAP خام بلا `ext-soap` + أسعار `CalculateRate`) |
-| DHL Express | عالمي | مباشر REST (MyDHL spec 3.3.1، Basic Auth) | ✅ | ✅ | — (الملصق داخل رد الإنشاء فقط) | — | — | ✅ جاهز (أسعار `GET/POST /rates` + إنشاء + تتبع) |
-| FedEx | عالمي | مباشر REST (OAuth2 + Ship/Rate/Track) | ✅ | ✅ | ✅ (بايتات `encodedLabel` المحفوظة، وإلا رابط التتبع) | ✅ | ✅ | ✅ جاهز (يحفظ بايتات الملصق — يصلح فجوة `shipbridge-fedex`) |
-| UPS | عالمي | مباشر REST (OAuth2) | ✅ | ✅ | ✅ (بايتات `GraphicImage` عبر recovery) | — | ✅ | ✅ (أسعار `Shop` + إلغاء `void` + COD) |
-| Egypt Post | مصر | **تتبع فقط** | ❌ | ✅ | — (رابط التتبع العام) | — | — | ✅ تتبع فقط (لا API إنشاء عمومية) |
-| Fake | الاختبارات | محلي | ✅ | ✅ | ✅ | — | ✅ | ✅ جاهز |
+| Bosta | Egypt | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mylerz | Egypt/MENA | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| SMSA | KSA/GCC | direct SOAP (raw XML, no `ext-soap`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Aramex | MENA/Global | direct SOAP (raw XML + `CalculateRate`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| DHL Express | Global | direct REST, MyDHL (Basic Auth) | ✅ | ✅ | inline-at-creation only | — | — | ✅ (rates + create + track) |
+| FedEx | Global | direct REST (OAuth2) | ✅ | ✅ | ✅ (`encodedLabel` preserved) | ✅ | ✅ | ✅ |
+| UPS | Global | direct REST (OAuth2) | ✅ | ✅ | ✅ (`GraphicImage` recovery) | — | ✅ | ✅ (Shop rates + void cancel) |
+| J&T Express | Egypt | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Egypt Post | Egypt | **tracking only** | ❌ | ✅ | public URL only | — | — | ✅ (no public creation API exists) |
+| Fake | Tests | in-memory | ✅ | ✅ | ✅ | — | ✅ | ✅ |
 
-> إضافة شركة = سائق جديد + `extend()` — دون لمس النواة.
+> Adding a carrier = a new driver + `extend()` — the core stays untouched. A driver must never claim an operation it does not support.
 
-## الاختبارات | Testing
+## Reliability
+
+- **Idempotency** — `idempotency_key` (unique) prevents duplicate carrier shipments on retries.
+- **Queues** — slow operations run as jobs with backoff that never re-creates carrier shipments.
+- **Webhooks** — signed per connection, with replay/duplicate protection and terminal-state guards.
+- **Secrets** — encrypted at rest, redacted from `raw` payloads, never in logs, exceptions, or API responses.
+
+## Testing
 
 ```bash
-composer test          # Pest: Unit + Feature
+composer test      # Pest: Unit + Feature
 composer run format    # Pint
 composer run analyse   # PHPStan
 ```
 
-تغطي الحزمة: توحيد الحالات، إعلان القدرات، عزل الاتصالات (اتصالان بنفس الشركة بمفتاحين مختلفين)، idempotency، وتوقيع الـ webhooks. اختبارات الـ sandbox الحية موسومة `group=live` وتتطلب مفاتيح حقيقية.
+Coverage includes: status normalization, capability declarations, connection isolation (two merchants, same carrier, different keys), idempotency, and webhook signatures. Live-sandbox tests are tagged `group=live` and require real credentials.
 
-## الحزمة المرافقة | Companion package
+## Companion package
 
-- **`adaa/shipping-filament`** — موارد Filament (الاتصالات/الشحنات) للإدارة والتجار. اختيارية تمامًا؛ المكتبة كاملة بدونها.
+- **`adaa/shipping-filament`** — optional Filament resources (connections/shipments) for admins and merchants. The core is complete without it.
 
-## خارطة الطريق | Roadmap
+## Roadmap
 
-- [x] النواة + `FakeDriver` + جسر Laravel + سجل الشركات
-- [ ] سائق Bosta + اختباراته
-- [x] سائق Aramex (SOAP خام: `CreateShipments`/`TrackShipments`/`PrintLabel`/`CalculateRate`، بلا `ext-soap`)
-- [ ] سائقو Mylerz / SMSA
-- [x] سائق UPS (REST + OAuth2: `ship`/`rating-Shop`/`track`/`label-recovery`/`void` + COD)
-- [ ] DHL / FedEx + تتبع Egypt Post
-- [ ] Jobs + webhooks موقعة + أوامر Artisan للتشخيص
-- [ ] حزمة Filament + أول إصدار موسوم `v0.1.0`
+- [x] Core + `FakeDriver` + Laravel bridge + carrier registry
+- [x] Bosta, Mylerz, SMSA, Aramex, DHL, FedEx, UPS, J&T drivers + Egypt Post tracking
+- [ ] Jobs + signed webhooks + Artisan diagnostics in the Laravel bridge
+- [ ] Filament package resources polish + first tagged release `v0.1.0`
 
-## المساهمة | Contributing
+## Contributing
 
-المشروع مفتوح المصدر (MIT). الرجاء: اختبار لكل تغيير، وPint قبل أي PR، وعدم إضافة شركة دون اختبارات `Http::fake` + توثيق قدراتها الحقيقية (لا تُعلن عملية غير مدعومة).
+Open source (MIT). Please: a test for every change, Pint before any PR, and never declare an unsupported operation — verify against the carrier's actual API and mark the evidence.
 
-## الشكر | Credits
+## Credits
 
-التصميم مستوحى من أفكار [ShipBridge](https://github.com/mohamedhekal/shipbridge) (DTOs، توحيد الحالات، نمط Client/PayloadFactory/Driver) و[v⁠erbb/shippy](https://github.com/verbb/shippy) (تعدد الحسابات الطبيعي، التسعير المقارن).
+Design inspired by [ShipBridge](https://github.com/mohamedhekal/shipbridge) (DTOs, status normalization, Client/PayloadFactory/Driver pattern) and [verbb/shippy](https://github.com/verbb/shippy) (natural multi-account design, comparative rates). Carrier mappings cross-checked against the most-adopted open-source SDKs per carrier (e.g. `octw/aramex`, `korbeil/dhl-express-php-api`, `WhatArmy/FedexRest`, UPS OpenAPI).
 
-## الترخيص | License
+## License
 
 MIT
