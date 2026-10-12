@@ -1,0 +1,63 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "adaa/shipping",
+    "description": "Framework-agnostic multi-carrier shipping library for PHP with optional Laravel integration. Platform-owned and merchant-owned connections, normalized statuses, idempotent shipments.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "shipping", "carriers", "tracking", "labels", "ecommerce", "php", "multi-vendor"],
+    "authors": [
+        { "name": "AdaaSystem" }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/http": "^10.0|^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "pestphp/pest": "^2.0|^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0",
+        "laravel/pint": "^1.0",
+        "phpstan/phpstan": "^1.0|^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Adaa\\Shipping\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Adaa\\Shipping\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Adaa\\Shipping\\Laravel\\GlobalShippingServiceProvider"
+            ]
+        }
+    },
+    "suggest": {
+        "filament/filament": "Required only for the optional adaa/shipping-filament admin UI package",
+        "mohamedhekal/shipbridge": "Reusable core DTOs and status normalization this package design is inspired by",
+        "mohamedhekal/shipbridge-bosta": "Bosta carrier driver (Egypt)",
+        "mohamedhekal/shipbridge-mylerz": "Mylerz carrier driver (Egypt/MENA)",
+        "mohamedhekal/shipbridge-smsa": "SMSA carrier driver (KSA/GCC, requires ext-soap)",
+        "mohamedhekal/shipbridge-aramex": "Aramex carrier driver (MENA/Global, requires ext-soap)",
+        "octw/aramex": "Mature alternative Aramex SDK for Laravel"
+    },
+    "scripts": {
+        "test": "pest",
+        "format": "pint",
+        "analyse": "phpstan analyse --memory-limit=512M"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
