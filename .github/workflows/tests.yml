@@ -31,8 +31,9 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
+      # opcache.enable_cli breaks Pint's Box phar on some setups; keep CI deterministic.
       - name: Check code style
-        run: vendor/bin/pint --test
+        run: php -d opcache.enable_cli=0 vendor/bin/pint --test
 
       - name: Run tests
         run: vendor/bin/pest --compact
