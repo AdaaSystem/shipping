@@ -135,6 +135,23 @@ composer run analyse   # PHPStan
 
 تغطي الحزمة: توحيد الحالات، إعلان القدرات، عزل الاتصالات (اتصالان بنفس الشركة بمفتاحين مختلفين)، idempotency، وتوقيع الـ webhooks. اختبارات الـ sandbox الحية موسومة `group=live` وتتطلب مفاتيح حقيقية.
 
+## حسابات Sandbox (من أين تحصل على مفاتيح الاختبار)
+
+> [!IMPORTANT]
+> إذا كان Packagist يعرض نسخة `dev-main` فقط لهذه الحزمة، افتح صفحة الحزمة واضغط **Update**، أو فعّل المزامنة التلقائية في <https://packagist.org/profile> (تطبيق Packagist على GitHub) — بعدها تُلتقط الـ tags تلقائيًا.
+
+| الشركة | التسجيل / الحصول على المفاتيح | ما تستلمه | مفاتيح الإعداد |
+|---|---|---|---|
+| Bosta | حساب Business في <https://bosta.co> ثم **API Integration** في اللوحة؛ الوثائق <https://docs.bosta.co> | `api_key` (ومضيف staging هو `https://stg-app.bosta.co`) | `api_key`، `base_url` |
+| Mylerz | حساب Business في <https://www.mylerz.com> وطلب الوصول لـ Integration API | `username` + `password` (السائق يبادلهما بتوكن) أو `token` ثابت | `username`، `password` (أو `token`) |
+| SMSA | حساب متعاقد عبر <https://www.smsaexpress.com> (تأهيل المبيعات) | `passkey` الخاصة بـ SECOM | `passkey` |
+| Aramex | بوابة المطورين <https://www.aramex.com/developers>؛ مضيف الاختبار `ws.dev.aramex.net` | `UserName`/`Password` + `AccountNumber`/`AccountPin`/`AccountEntity`/`AccountCountryCode` | `username`، `password`، `account_number`، `account_pin`، `account_entity`، `account_country_code` |
+| DHL Express | بوابة MyDHL في <https://developer.dhl.com> | `username` + `password` بنمط Basic Auth (مع `account_number`) | `username`، `password`، `account_number` |
+| FedEx | بوابة المطورين <https://developer.fedex.com> (مضيف sandbox هو `apis-sandbox.fedex.com`) | `client_id` + `client_secret` بنمط OAuth2 (مع `account_number`) | `client_id`، `client_secret`، `account_number` |
+| UPS | بوابة المطورين <https://developer.ups.com> (sandbox هو `wwwcie.ups.com`) | `client_id` + `client_secret` بنمط OAuth2 (مع `account_number`) | `client_id`، `client_secret`، `account_number` |
+| J&T Express مصر | تأهيل التجار في <https://www.jtexpress-eg.com> | `api_account` + `customer_code` + `private_key` + `customer_pwd` | `api_account`، `customer_code`، `private_key`، `customer_pwd` |
+| Egypt Post | — (تتبع فقط؛ لا API إنشاء عمومية) | — | — |
+
 ## الحزمة المرافقة
 
 - **`adaa/shipping-filament`** — موارد Filament (الاتصالات/الشحنات) للإدارة والتجار. اختيارية تمامًا؛ المكتبة كاملة بدونها.

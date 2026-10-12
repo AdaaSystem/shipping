@@ -136,6 +136,23 @@ composer run analyse   # PHPStan
 
 Coverage includes: status normalization, capability declarations, connection isolation (two merchants, same carrier, different keys), idempotency, and webhook signatures. Live-sandbox tests are tagged `group=live` and require real credentials.
 
+## Sandbox accounts (where to get test keys)
+
+> [!IMPORTANT]
+> If Packagist shows only `dev-main` for this package, open the package page and press **Update**, or enable auto-sync at <https://packagist.org/profile> (Packagist GitHub App) — tags are picked up automatically from then on.
+
+| Carrier | Register / get keys | What you receive | Config keys to fill |
+|---|---|---|---|
+| Bosta | Business account at <https://bosta.co>, then **API Integration** in the dashboard; docs at <https://docs.bosta.co> | `api_key` (+ staging host `https://stg-app.bosta.co`) | `api_key`, `base_url` |
+| Mylerz | Business account at <https://www.mylerz.com>, request Integration API access | `username` + `password` (driver exchanges them for a token) or a static `token` | `username`, `password` (or `token`) |
+| SMSA | Contracted account via <https://www.smsaexpress.com> (sales onboarding) | SECOM `passkey` | `passkey` |
+| Aramex | Developer portal <https://www.aramex.com/developers>; test endpoint `ws.dev.aramex.net` | `UserName`/`Password` + `AccountNumber`/`AccountPin`/`AccountEntity`/`AccountCountryCode` | `username`, `password`, `account_number`, `account_pin`, `account_entity`, `account_country_code` |
+| DHL Express | MyDHL API portal <https://developer.dhl.com> | Basic-Auth `username` + `password` (+ `account_number`) | `username`, `password`, `account_number` |
+| FedEx | Developer portal <https://developer.fedex.com> (sandbox host `apis-sandbox.fedex.com`) | OAuth2 `client_id` + `client_secret` (+ `account_number`) | `client_id`, `client_secret`, `account_number` |
+| UPS | Developer portal <https://developer.ups.com> (CIE sandbox `wwwcie.ups.com`) | OAuth2 `client_id` + `client_secret` (+ `account_number`) | `client_id`, `client_secret`, `account_number` |
+| J&T Express Egypt | Merchant onboarding at <https://www.jtexpress-eg.com> | `api_account` + `customer_code` + `private_key` + `customer_pwd` | `api_account`, `customer_code`, `private_key`, `customer_pwd` |
+| Egypt Post | — (tracking only; no public creation API) | — | — |
+
 ## Companion package
 
 - **`adaa/shipping-filament`** — optional Filament resources (connections/shipments) for admins and merchants. The core is complete without it.
