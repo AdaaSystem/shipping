@@ -73,6 +73,12 @@ $manager->extend('bosta', fn ($ctx) => BostaDriver::fromConnection(app(HttpFacto
 | FedEx | `client_id`, `client_secret`, `account_number` (OAuth2) | [Developer portal](https://developer.fedex.com), sandbox `apis-sandbox.fedex.com` |
 | UPS | `client_id`, `client_secret`, `account_number` (OAuth2) | [Developer portal](https://developer.ups.com), sandbox `wwwcie.ups.com` |
 | J&T Express Egypt | `api_account`, `customer_code`, `private_key`, `customer_pwd` | Merchant onboarding ([site](https://www.jtexpress-eg.com)) |
+| MNG Kargo | `client_id`, `client_secret` (IBM app) + `customer_number`, `password` (panel, JWT) | ApiZone portal ([site](https://www.mngkargo.com.tr)), sandbox `testapi.mngkargo.com.tr` |
+| HepsiJet | `username`, `password` (Basic → `X-Auth-Token`) + `abbreviation_code`, `company_name`, `company_address_id`, `current_xdock_code` | Merchant onboarding, sandbox `integration-apitest.hepsijet.com` |
+| Yurtiçi Kargo | `ws_user_name`, `ws_password` (+ `ws_language`, default `TR`) | Branch-issued WS credentials ([site](https://www.yurticikargo.com)) |
+| Aras Kargo | `username`, `password` + `customer_code` (Esasweb tracking; optional `tracking_endpoint`) | Branch SetOrder user + Esasweb ([site](https://www.araskargo.com.tr)) |
+| Sürat Kargo | `kullanici_adi`, `sifre` (+ `web_sifre` for create) | Branch-issued SOAP credentials, test `prova.suratkargo.com.tr` ([site](https://www.suratkargo.com.tr)) |
+| PTT Kargo | `musteri_id`, `sifre` (+ `kullanici`, default `PttWs`; pre-allocated `metadata.barcode`) | PTT corporate WS ([site](https://www.ptt.gov.tr)) |
 | Egypt Post | — (tracking only, no creation API exists) | — |
 
 Common optional keys every HTTP driver honors: `base_url` / `endpoint` override, `timeout` (seconds), `environment` (`sandbox`|`production`).
@@ -235,7 +241,7 @@ $driver = BostaDriver::fromConnection($http, $connection);
 
 ## Supported drivers
 
-Bosta, Mylerz, SMSA, Aramex, DHL Express, FedEx, UPS, J&T Express Egypt — full create/track/label (plus cancel/return/exchange/COD where the carrier API supports it; check `$driver->capabilities()`); Egypt Post tracking only; `FakeDriver` for tests. Adding a carrier = new driver + `extend()`, core untouched.
+Bosta, Mylerz, SMSA, Aramex, DHL Express, FedEx, UPS, J&T Express Egypt — full create/track/label (plus cancel/return/exchange/COD where the carrier API supports it; check `$driver->capabilities()`); MNG Kargo, Yurtiçi Kargo, Sürat Kargo, PTT Kargo — create/track/cancel/return/exchange/COD, labels honestly disabled (ZPL/EPL only at create time or barcode-print; check `$driver->capabilities()`); HepsiJet — create/track/label/return/exchange/COD (no cancel endpoint); Aras Kargo — create/track/label/cancel/return/exchange/COD; Egypt Post tracking only; `FakeDriver` for tests. Adding a carrier = new driver + `extend()`, core untouched.
 
 Companion admin UI: [`adaa/shipping-filament`](https://github.com/AdaaSystem/shipping-filament) (optional Filament resources + dashboard).
 
