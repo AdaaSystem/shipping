@@ -13,4 +13,11 @@ abstract class TestCase extends BaseTestCase
     {
         return [GlobalShippingServiceProvider::class];
     }
+
+    protected function getEnvironmentSetUp($app): void
+    {
+        // Routes register at boot, so middleware must be set here —
+        // a beforeEach hook would run too late.
+        $app['config']->set('shipping.webhook.middleware', ['api']);
+    }
 }

@@ -33,4 +33,27 @@ final readonly class ShipmentDraft
             'idempotency_key' => $this->idempotencyKey,
         ];
     }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        $parcels = [];
+
+        foreach ((array) ($data['parcels'] ?? []) as $parcel) {
+            if (is_array($parcel)) {
+                $parcels[] = Parcel::fromArray($parcel);
+            }
+        }
+
+        return new self(
+            origin: Address::fromArray((array) ($data['origin'] ?? [])),
+            destination: Address::fromArray((array) ($data['destination'] ?? [])),
+            parcels: $parcels,
+            reference: isset($data['reference']) ? (string) $data['reference'] : null,
+            metadata: (array) ($data['metadata'] ?? []),
+            idempotencyKey: isset($data['idempotency_key']) ? (string) $data['idempotency_key'] : null,
+        );
+    }
 }

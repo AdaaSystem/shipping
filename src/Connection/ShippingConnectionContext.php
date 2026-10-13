@@ -41,4 +41,44 @@ final readonly class ShippingConnectionContext
     {
         return "shipping:token:{$this->connectionId}:{$suffix}";
     }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        $text = static fn (string $key): ?string => isset($data[$key]) && $data[$key] !== ''
+            ? (string) $data[$key]
+            : null;
+
+        return new self(
+            connectionId: (string) ($data['connection_id'] ?? ''),
+            carrierCode: (string) ($data['carrier_code'] ?? ''),
+            mode: ConnectionMode::tryFrom((string) ($data['mode'] ?? '')) ?? ConnectionMode::Merchant,
+            environment: Environment::tryFrom((string) ($data['environment'] ?? '')) ?? Environment::Sandbox,
+            credentials: (array) ($data['credentials'] ?? []),
+            merchantId: $text('merchant_id'),
+            storeId: $text('store_id'),
+            externalAccountId: $text('external_account_id'),
+            metadata: (array) ($data['metadata'] ?? []),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'connection_id' => $this->connectionId,
+            'carrier_code' => $this->carrierCode,
+            'mode' => $this->mode->value,
+            'environment' => $this->environment->value,
+            'credentials' => $this->credentials,
+            'merchant_id' => $this->merchantId,
+            'store_id' => $this->storeId,
+            'external_account_id' => $this->externalAccountId,
+            'metadata' => $this->metadata,
+        ];
+    }
 }

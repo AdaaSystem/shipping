@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.2.0]
+
+- Laravel bridge: `CreateShipmentJob` (unique, retried) + `ShipmentCreated`/`ShipmentFailed`/`WebhookReceived` events.
+- Signed webhook endpoint (`{prefix}/{carrier}`) with `WebhookSecretResolver` contract + `HandlesWebhooks` driver opt-in.
+- `shipping:drivers` and `shipping:diagnose` Artisan commands; `ShippingManager::registered()`; DTO `fromArray` round-trips.
+
 - Carrier registry declares honest `required_credentials` per carrier (mirroring what each `*Client` actually reads; `[]` for Egypt Post and Fake) so UIs can presence-check connections without touching secrets.
 - Initial scaffold: framework-agnostic core (Contracts, DTOs, Enums, StatusNormalizer, CarrierRegistry, ShippingManager, FakeDriver) + Laravel service provider stub + Pest test skeleton.
 - Native Bosta driver (`src/Drivers/Bosta/`: BostaClient, BostaDriver, BostaPayloadFactory, DeliveryType) with create/track/label/cancel, return (CRP 25) + exchange (30) via create payload, COD + webhooks, raw `Authorization` API-key auth, sandbox/production hosts, and Pest coverage via injectable `Http\Factory::fake()`.

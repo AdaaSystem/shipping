@@ -220,6 +220,36 @@ $result = app(ShippingManager::class)->driverFor($context)->createShipment($draf
 
 Queue slow calls, key jobs by `connectionId`, and never log `$context->credentials`. Verify carrier webhooks per connection secret before trusting status updates.
 
+### Async jobs, webhooks & diagnostics (built in)
+
+```php
+use Adaa\Shipping\Laravel\Contracts\WebhookSecretResolver;
+use Adaa\Shipping\Laravel\Jobs\CreateShipmentJob;
+
+// 1. Queue creation — persist by listening to the events:
+CreateShipmentJob::dispatch($connection->toArray(), $draft->toArray());
+// → Adaa\Shipping\Laravel\Events\ShipmentCreated (connectionId, carrierCode, ShipmentResult)
+// → Adaa\Shipping\Laravel\Events\ShipmentFailed (connectionId, carrierCode, error, reference)
+// The job is unique per idempotency key, tries 3 times with backoff, and rethrows for retry.
+
+// 2. Webhooks — route auto-registered at {prefix}/{carrier} (default webhooks/shipping).
+// Bind one resolver; the controller verifies HMAC signatures per connection secret:
+app()->bind(WebhookSecretResolver::class, fn () => new class implements WebhookSecretResolver {
+    public function secretFor(string $carrierCode, array $payload): ?string
+    {
+        return ShippingConnection::where('carrier_code', $carrierCode)->value('webhook_secret');
+    }
+});
+// → Adaa\Shipping\Laravel\Events\WebhookReceived (carrierCode, trackingNumber, status, payload)
+// Drivers may also implement HandlesWebhooks for custom schemes. Unsigned calls are
+// rejected unless shipping.webhook.allow_unsigned is true (dev only).
+```
+
+```bash
+php artisan shipping:drivers            # registered drivers + declared capabilities
+php artisan shipping:diagnose bosta     # registry metadata + required credentials (no live calls)
+```
+
 ## Statuses & errors
 
 Carrier strings (`OFD`, `shipped`, …) normalize to `ShipmentStatus`; unknown values become `exception` instead of throwing, so webhooks stay resilient. `ShippingException::carrierFailed($message, $status)` carries the HTTP status; `shipmentNotFound()` uses 404. Drivers strip secrets from `raw` before returning it — still, never dump `raw` to logs in production.

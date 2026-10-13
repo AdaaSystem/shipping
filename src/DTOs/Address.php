@@ -39,4 +39,24 @@ final readonly class Address
             'lng' => $this->lng,
         ];
     }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            name: (string) ($data['name'] ?? ''),
+            line1: (string) ($data['line1'] ?? ''),
+            city: (string) ($data['city'] ?? ''),
+            countryCode: (string) ($data['country_code'] ?? ''),
+            line2: isset($data['line2']) ? (string) $data['line2'] : null,
+            state: isset($data['state']) ? (string) $data['state'] : null,
+            postalCode: isset($data['postal_code']) ? (string) $data['postal_code'] : null,
+            phone: isset($data['phone']) ? (string) $data['phone'] : null,
+            email: isset($data['email']) ? (string) $data['email'] : null,
+            lat: isset($data['lat']) && is_numeric($data['lat']) ? (float) $data['lat'] : null,
+            lng: isset($data['lng']) && is_numeric($data['lng']) ? (float) $data['lng'] : null,
+        );
+    }
 }

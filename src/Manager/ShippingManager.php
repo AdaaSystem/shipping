@@ -46,6 +46,20 @@ final class ShippingManager
     }
 
     /**
+     * Per-connection driver when a factory exists, shared driver as a
+     * fallback (fake and other credential-less drivers). Used by flows
+     * like webhook verification that carry no connection credentials.
+     */
+    public function driverForOrShared(ShippingConnectionContext $connection): CarrierDriverInterface
+    {
+        if (isset($this->factories[$connection->carrierCode])) {
+            return $this->driverFor($connection);
+        }
+
+        return $this->shared($connection->carrierCode);
+    }
+
+    /**
      * Shared (credential-less) drivers, e.g. fake. Never use for carriers
      * with per-connection credentials.
      */
@@ -58,5 +72,18 @@ final class ShippingManager
     {
         return $this->shared[$carrierCode]
             ?? throw ShippingException::unknownCarrier($carrierCode);
+    }
+
+    /**
+     * Registered carrier codes (factories first, then shared drivers).
+     *
+     * @return list<string>
+     */
+    public function registered(): array
+    {
+        return array_values(array_unique([
+            ...array_keys($this->factories),
+            ...array_keys($this->shared),
+        ]));
     }
 }
