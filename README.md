@@ -2,40 +2,17 @@
 
 > **English** | [العربية](README.ar.md)
 
-Framework-agnostic multi-carrier shipping library for PHP with first-class Laravel support — built for **multi-vendor marketplaces** where every merchant connects their **own** carrier account, alongside the platform's **own** accounts, with zero cross-contamination.
-
-## Why this package?
-
-Most shipping libraries assume **one account per carrier** (a single API key in `.env`). That breaks the marketplace model:
-
-- Merchant A holds a Bosta contract with **their** key; merchant B holds a **different** Bosta contract;
-- The platform itself holds a third account for subsidized shipping.
-
-`adaa/shipping` solves this with a **connection context** (`ShippingConnectionContext`): every shipment runs through a driver built from **that connection's own credentials** — no global config, no shared keys, no cross-merchant leaks.
-
-## Highlights
-
-- **Two connection modes** — `platform` (marketplace-owned accounts) and `merchant` (merchant-owned accounts), fully isolated.
-- **Opt-in capabilities** — each driver declares only what it truly supports (`rates`, `create`, `label`, `track`, `cancel`, `pickup`, `return`, `exchange`, `cod`, `webhooks`…). Tracking-only carriers are never offered for creation.
-- **Normalized statuses & errors** (`ShipmentStatus` + `StatusNormalizer`) while preserving the carrier's raw payload (`raw`) with secrets redacted.
-- **Framework-agnostic core** — works in any PHP project; Laravel bridge is optional; the Filament admin UI lives in a separate package (`adaa/shipping-filament`), so this library runs perfectly without Filament.
-- **Reliability built in** — idempotency keys, queued dispatch, per-connection signed webhooks, and an audit trail.
-
-## Requirements
-
-- PHP `^8.3`
-- `illuminate/contracts`, `illuminate/support`, `illuminate/http` (`^10.0|^11.0|^12.0|^13.0`) — the core only needs an injectable HTTP client; no facades outside the Laravel bridge.
-
-## Installation
+Multi-carrier shipping for PHP with first-class Laravel support. Connect once per carrier **account** — the platform's own accounts and every merchant's own accounts stay fully isolated.
 
 ```bash
 composer require adaa/shipping
 ```
 
-## Quick start (plain PHP)
+## 60-second start (no keys needed)
 
 ```php
 use Adaa\Shipping\Connection\ShippingConnectionContext;
+use Adaa\Shipping\Drivers\FakeDriver;
 use Adaa\Shipping\DTOs\Address;
 use Adaa\Shipping\DTOs\Parcel;
 use Adaa\Shipping\DTOs\ShipmentDraft;
@@ -43,150 +20,228 @@ use Adaa\Shipping\Enums\ConnectionMode;
 use Adaa\Shipping\Enums\Environment;
 use Adaa\Shipping\Manager\ShippingManager;
 
-$manager = new ShippingManager();
+$manager = new ShippingManager;
+$manager->share('fake', new FakeDriver);
 
-// Register a driver: the factory receives the connection context,
-// so the driver is always built with that connection's credentials.
-$manager->extend('bosta', fn (ShippingConnectionContext $c) => BostaDriver::fromConnection($http, $c));
-
-// One merchant's connection — invisible to, and unshared with, everyone else.
 $connection = new ShippingConnectionContext(
-    connectionId: 'conn_42',
-    carrierCode: 'bosta',
+    connectionId: 'conn_1',
+    carrierCode: 'fake',
     mode: ConnectionMode::Merchant,
-    environment: Environment::Production,
-    credentials: ['api_key' => '...'],   // in-memory only — never logged or returned
+    environment: Environment::Sandbox,
     merchantId: 'merchant_7',
 );
 
-$shipment = $manager->driverFor($connection)->createShipment(new ShipmentDraft(
+$shipment = $manager->shared('fake')->createShipment(new ShipmentDraft(
     origin: new Address(name: 'Warehouse', line1: '1 Industrial Rd', city: 'Cairo', countryCode: 'EG'),
     destination: new Address(name: 'Ahmed Ali', line1: '12 Nile St', city: 'Giza', countryCode: 'EG', phone: '01000000000'),
     parcels: [new Parcel(weightKg: 1.5, description: 'T-shirt')],
     reference: 'ORD-1001',
-    metadata: ['cod' => 450, 'city_code' => 'EG-02'],
-    idempotencyKey: 'ord-1001-bosta',
-));
+), $connection);
 
-echo $shipment->trackingNumber;
+echo $shipment->trackingNumber; // e.g. SHP00000001
 ```
 
-## Laravel integration
+## Core concepts (read once)
+
+| Class | What it is |
+|---|---|
+| `ShippingConnectionContext` | One carrier **account**: `connectionId`, `carrierCode`, `mode` (`platform`/`merchant`), `environment`, `credentials` (in-memory only), `merchantId`, `storeId`, `externalAccountId`. |
+| `ShippingManager` | Resolves drivers. `extend($code, fn ($ctx) => ...)` registers a carrier; `driverFor($connection)` builds it **from that connection's credentials**; `shared($code)` returns credential-less drivers (fake). |
+| `CarrierDriverInterface` | What every driver implements: `capabilities()` + `createShipment()`. Everything else (`SupportsRates`, `SupportsTracking`, `SupportsLabels`, `SupportsCancellation`) is opt-in — check `capabilities()` or `instanceof` before calling. |
+| DTOs | `ShipmentDraft` (in) → `ShipmentResult` (`id`, `trackingNumber`, `status`, `labelUrl`, `rate`, `currency`, `raw`) → `TrackingResult` (`status`, `events[]`) → `LabelResult` (`contents`, `base64Encoded`, `url`). |
+
+## Connecting a real carrier
+
+Register the driver once (e.g. in a service provider), passing each connection's own credentials:
+
+```php
+use Adaa\Shipping\Drivers\Bosta\BostaDriver;
+use Illuminate\Http\Client\Factory as HttpFactory;
+
+$manager->extend('bosta', fn ($ctx) => BostaDriver::fromConnection(app(HttpFactory::class), $ctx));
+```
+
+`fromConnection()` exists on **every** driver with the same signature. Credentials come from your connection row (encrypted in your DB) — never from `.env` when you serve multiple merchants.
+
+| Carrier | Credential fields in `credentials` | Where to get them |
+|---|---|---|
+| Bosta | `api_key`, `base_url` (`https://app.bosta.co`, staging `https://stg-app.bosta.co`) | Business account → API Integration ([docs](https://docs.bosta.co)) |
+| Mylerz | `username`, `password` (auto-exchanged for a token) or static `token` | Business account, request Integration API access ([site](https://www.mylerz.com)) |
+| SMSA | `passkey` | Contracted SECOM account ([site](https://www.smsaexpress.com)) |
+| Aramex | `username`, `password`, `account_number`, `account_pin`, `account_entity`, `account_country_code` | [Developer portal](https://www.aramex.com/developers), test host `ws.dev.aramex.net` |
+| DHL Express | `username`, `password`, `account_number` (HTTP Basic) | [MyDHL portal](https://developer.dhl.com) |
+| FedEx | `client_id`, `client_secret`, `account_number` (OAuth2) | [Developer portal](https://developer.fedex.com), sandbox `apis-sandbox.fedex.com` |
+| UPS | `client_id`, `client_secret`, `account_number` (OAuth2) | [Developer portal](https://developer.ups.com), sandbox `wwwcie.ups.com` |
+| J&T Express Egypt | `api_account`, `customer_code`, `private_key`, `customer_pwd` | Merchant onboarding ([site](https://www.jtexpress-eg.com)) |
+| Egypt Post | — (tracking only, no creation API exists) | — |
+
+Common optional keys every HTTP driver honors: `base_url` / `endpoint` override, `timeout` (seconds), `environment` (`sandbox`|`production`).
+
+## Operations reference
+
+All examples assume `$driver = $manager->driverFor($connection)` and throw `Adaa\Shipping\Exceptions\ShippingException` on carrier failure.
+
+### Create a shipment (+ COD)
+
+```php
+$shipment = $driver->createShipment(new ShipmentDraft(
+    origin: new Address(name: 'Store', line1: '1 Industrial Rd', city: 'Cairo', countryCode: 'EG', phone: '01011111111'),
+    destination: new Address(name: 'Sara', line1: '5 Zamalek St', city: 'Cairo', countryCode: 'EG', phone: '01000000000'),
+    parcels: [new Parcel(weightKg: 2.0, description: 'Shoes', quantity: 1)],
+    reference: 'ORD-1002',                       // your order id
+    metadata: ['cod' => 750],                    // cash on delivery (carrier converts it)
+    idempotencyKey: 'ord-1002-bosta',            // safe to retry with the same key
+), $connection);
+
+$shipment->id;              // carrier shipment id
+$shipment->trackingNumber;  // track with this
+$shipment->labelUrl;        // when the carrier returns one inline
+```
+
+Per-carrier extras go in `metadata` (see each driver's `*PayloadFactory`): Bosta `city_code`/`zone`/`district`/`building_number`/`notes`/`webhook_url`; J&T `express_type`/`service_type`; UPS `service_code` (`11` = standard); FedEx `service_type`; Aramex product type, etc.
+
+### Get rates (where supported)
+
+```php
+if ($driver instanceof SupportsRates) {
+    foreach ($driver->rates($draft, $connection) as $quote) {
+        echo "{$quote->serviceName}: {$quote->amount} {$quote->currency}\n";
+        // $quote->serviceCode, $quote->estimatedDelivery
+    }
+}
+```
+
+### Track
+
+```php
+$tracking = $driver->track('BOSTA-TRACKING-NO', $connection);
+echo $tracking->status->value; // created|labeled|picked_up|in_transit|out_for_delivery|delivered|exception|cancelled|returned|exchanged
+foreach ($tracking->events as $event) {
+    echo "{$event->occurredAt} [{$event->location}] {$event->description}\n";
+}
+```
+
+### Labels
+
+```php
+$label = $driver->label($shipment->id, $connection, LabelFormat::Pdf);
+
+if ($label->url !== null) {
+    // redirect / store the URL
+} else {
+    file_put_contents('label.pdf', $label->base64Encoded ? base64_decode($label->contents) : $label->contents);
+}
+```
+
+### Cancel
+
+```php
+if ($driver instanceof SupportsCancellation) {
+    $driver->cancel($shipment->id, $connection); // bool
+}
+```
+
+### Returns & exchanges
+
+No separate endpoints — carriers model these as delivery types on creation:
+
+```php
+use Adaa\Shipping\Drivers\Bosta\DeliveryType;
+
+$return = $driver->createShipment(new ShipmentDraft(
+    origin: $customerAddress,      // picked up FROM the customer
+    destination: $warehouseAddress,
+    parcels: [new Parcel(weightKg: 1.0)],
+    reference: 'RET-501',
+    metadata: ['type' => DeliveryType::CRP],   // Customer Return Pickup
+), $connection);
+
+$exchange = $driver->createShipment(new ShipmentDraft(
+    origin: $warehouseAddress,
+    destination: $customerAddress,
+    parcels: [new Parcel(weightKg: 1.0, description: 'Size M')],
+    reference: 'EXC-501',
+    metadata: ['type' => DeliveryType::EXCHANGE],
+), $connection);
+```
+
+## Two accounts, same carrier (the whole point)
+
+```php
+$platform = new ShippingConnectionContext('conn_platform', 'bosta', ConnectionMode::Platform, Environment::Production, ['api_key' => 'PLATFORM_KEY']);
+$merchant = new ShippingConnectionContext('conn_42', 'bosta', ConnectionMode::Merchant, Environment::Production, ['api_key' => 'MERCHANT_KEY'], merchantId: 'm42');
+
+// Different instances, different credentials, zero shared state:
+$manager->driverFor($platform)->createShipment($draftA, $platform);
+$manager->driverFor($merchant)->createShipment($draftB, $merchant);
+```
+
+## Laravel
+
+Publish the config, then resolve per request from **your** connection rows (encrypted credentials in DB):
 
 ```bash
 php artisan vendor:publish --tag=shipping-config
 ```
 
 ```php
-use Adaa\Shipping\Manager\ShippingManager;
-
-$result = app(ShippingManager::class)->driverFor($connection)->createShipment($draft);
+// Migration sketch for your connections table:
+Schema::create('shipping_connections', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('merchant_id')->nullable()->constrained()->cascadeOnDelete(); // NULL = platform
+    $table->string('carrier_code')->index();
+    $table->string('mode')->default('platform');        // platform|merchant
+    $table->string('environment')->default('sandbox');  // sandbox|production
+    $table->json('credentials')->nullable();            // cast encrypted:array on the model + $hidden
+    $table->string('status')->default('pending');
+    $table->timestamps();
+});
 ```
-
-Suggested schema (publish your own migrations or bring your models):
-
-| Table | Role |
-|---|---|
-| `shipping_connections` | One row per connection: nullable `merchant_id` (NULL = platform), `carrier_code`, **encrypted** `credentials`, `environment`, `status`, … |
-| `shipping_shipments` | One row per shipment: `order_id`, `connection_id`, `tracking_number`, unique `idempotency_key`, normalized status, … |
-| `shipping_events` | Audit trail for every status transition. |
-
-> Golden rule: with multiple merchants, never put carrier keys in `.env` — each connection carries its own encrypted credentials in the database.
-
-## Carrier eligibility
-
-Never use the merchant's country alone. `CarrierRegistry` (static metadata: origin countries, services) is combined at runtime with the merchant's active connections and each connection's capabilities:
 
 ```php
-$eligible = app(\Adaa\Shipping\Registry\CarrierRegistry::class)->eligibleForOrigin('EG');
-// e.g. ['aramex', 'bosta', 'egyptpost', 'fake', 'mylerz'] — then filtered by active connections + capabilities.
+// Resolve inside a job / controller — credentials live only for the call:
+$context = new ShippingConnectionContext(
+    connectionId: (string) $row->id,
+    carrierCode: $row->carrier_code,
+    mode: $row->mode === 'platform' ? ConnectionMode::Platform : ConnectionMode::Merchant,
+    environment: Environment::from($row->environment),
+    credentials: $row->credentials ?? [],   // decrypted via encrypted:array cast
+    merchantId: $row->merchant_id ? (string) $row->merchant_id : null,
+);
+
+$result = app(ShippingManager::class)->driverFor($context)->createShipment($draft, $context);
 ```
 
-## Drivers
+Queue slow calls, key jobs by `connectionId`, and never log `$context->credentials`. Verify carrier webhooks per connection secret before trusting status updates.
 
-| Carrier | Region | Type | create | track | label | return/exchange | COD | Status |
-|---|---|---|---|---|---|---|---|---|
-| Bosta | Egypt | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Mylerz | Egypt/MENA | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| SMSA | KSA/GCC | direct SOAP (raw XML, no `ext-soap`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Aramex | MENA/Global | direct SOAP (raw XML + `CalculateRate`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| DHL Express | Global | direct REST, MyDHL (Basic Auth) | ✅ | ✅ | inline-at-creation only | — | — | ✅ (rates + create + track) |
-| FedEx | Global | direct REST (OAuth2) | ✅ | ✅ | ✅ (`encodedLabel` preserved) | ✅ | ✅ | ✅ |
-| UPS | Global | direct REST (OAuth2) | ✅ | ✅ | ✅ (`GraphicImage` recovery) | — | ✅ | ✅ (Shop rates + void cancel) |
-| J&T Express | Egypt | direct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Egypt Post | Egypt | **tracking only** | ❌ | ✅ | public URL only | — | — | ✅ (no public creation API exists) |
-| Fake | Tests | in-memory | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+## Statuses & errors
 
-> Adding a carrier = a new driver + `extend()` — the core stays untouched. A driver must never claim an operation it does not support.
+Carrier strings (`OFD`, `shipped`, …) normalize to `ShipmentStatus`; unknown values become `exception` instead of throwing, so webhooks stay resilient. `ShippingException::carrierFailed($message, $status)` carries the HTTP status; `shipmentNotFound()` uses 404. Drivers strip secrets from `raw` before returning it — still, never dump `raw` to logs in production.
 
-## Reliability
+## Testing your integration
 
-- **Idempotency** — `idempotency_key` (unique) prevents duplicate carrier shipments on retries.
-- **Queues** — slow operations run as jobs with backoff that never re-creates carrier shipments.
-- **Webhooks** — signed per connection, with replay/duplicate protection and terminal-state guards.
-- **Secrets** — encrypted at rest, redacted from `raw` payloads, never in logs, exceptions, or API responses.
+```php
+// Unit / feature tests: FakeDriver is deterministic.
+$driver = new FakeDriver;
+$shipment = $driver->createShipment($draft, $connection);
+$driver->advance($shipment->trackingNumber, ShipmentStatus::Delivered);
+$this->assertEquals(ShipmentStatus::Delivered, $driver->track($shipment->trackingNumber, $connection)->status);
 
-## Testing
-
-```bash
-composer test      # Pest: Unit + Feature
-composer run format    # Pint
-composer run analyse   # PHPStan
+// HTTP-level tests: inject Illuminate\Http\Client\Factory and fake it.
+$http = new Factory;
+$http->fake(['*' => Http::response([...], 200)]);
+$driver = BostaDriver::fromConnection($http, $connection);
 ```
 
-Coverage includes: status normalization, capability declarations, connection isolation (two merchants, same carrier, different keys), idempotency, and webhook signatures. Live-sandbox tests are tagged `group=live` and require real credentials.
+## Supported drivers
 
-## Sandbox accounts (where to get test keys)
+Bosta, Mylerz, SMSA, Aramex, DHL Express, FedEx, UPS, J&T Express Egypt — full create/track/label (plus cancel/return/exchange/COD where the carrier API supports it; check `$driver->capabilities()`); Egypt Post tracking only; `FakeDriver` for tests. Adding a carrier = new driver + `extend()`, core untouched.
 
-> [!IMPORTANT]
-> If Packagist shows only `dev-main` for this package, open the package page and press **Update**, or enable auto-sync at <https://packagist.org/profile> (Packagist GitHub App) — tags are picked up automatically from then on.
-
-| Carrier | Register / get keys | What you receive | Config keys to fill |
-|---|---|---|---|
-| Bosta | Business account at <https://bosta.co>, then **API Integration** in the dashboard; docs at <https://docs.bosta.co> | `api_key` (+ staging host `https://stg-app.bosta.co`) | `api_key`, `base_url` |
-| Mylerz | Business account at <https://www.mylerz.com>, request Integration API access | `username` + `password` (driver exchanges them for a token) or a static `token` | `username`, `password` (or `token`) |
-| SMSA | Contracted account via <https://www.smsaexpress.com> (sales onboarding) | SECOM `passkey` | `passkey` |
-| Aramex | Developer portal <https://www.aramex.com/developers>; test endpoint `ws.dev.aramex.net` | `UserName`/`Password` + `AccountNumber`/`AccountPin`/`AccountEntity`/`AccountCountryCode` | `username`, `password`, `account_number`, `account_pin`, `account_entity`, `account_country_code` |
-| DHL Express | MyDHL API portal <https://developer.dhl.com> | Basic-Auth `username` + `password` (+ `account_number`) | `username`, `password`, `account_number` |
-| FedEx | Developer portal <https://developer.fedex.com> (sandbox host `apis-sandbox.fedex.com`) | OAuth2 `client_id` + `client_secret` (+ `account_number`) | `client_id`, `client_secret`, `account_number` |
-| UPS | Developer portal <https://developer.ups.com> (CIE sandbox `wwwcie.ups.com`) | OAuth2 `client_id` + `client_secret` (+ `account_number`) | `client_id`, `client_secret`, `account_number` |
-| J&T Express Egypt | Merchant onboarding at <https://www.jtexpress-eg.com> | `api_account` + `customer_code` + `private_key` + `customer_pwd` | `api_account`, `customer_code`, `private_key`, `customer_pwd` |
-| Egypt Post | — (tracking only; no public creation API) | — | — |
-
-## Companion package
-
-- **`adaa/shipping-filament`** — optional Filament resources (connections/shipments) for admins and merchants. The core is complete without it.
-
-## Roadmap
-
-- [x] Core + `FakeDriver` + Laravel bridge + carrier registry
-- [x] Bosta, Mylerz, SMSA, Aramex, DHL, FedEx, UPS, J&T drivers + Egypt Post tracking
-- [ ] Jobs + signed webhooks + Artisan diagnostics in the Laravel bridge
-- [x] Filament companion package + CI + automated releases (`v0.1.0`)
-
-## Releases & automatic updates
-
-New versions flow to every project automatically — no reinstall, no re-submit:
-
-1. **Maintainer tags a release:** `git tag v0.2.0 && git push --tags`
-2. **GitHub Action** (`.github/workflows/release.yml`) creates the GitHub Release with auto-generated notes.
-3. **Packagist syncs itself** via the GitHub integration (one-time setup below) — the new version appears within minutes.
-4. **Consumer projects** get it with a normal `composer update adaa/shipping` (or automatically via Dependabot/Renovate).
-
-One-time Packagist setup (do it once per package):
-
-1. Submit the repo (first time only): <https://packagist.org/packages/submit> — enter `https://github.com/AdaaSystem/shipping`.
-2. Enable auto-sync: open <https://packagist.org/profile>, authorize the **Packagist GitHub App** for the `AdaaSystem` organization. From then on every tag syncs without clicks (see <https://packagist.org/about#how-to-update-packages>).
-
-CI runs on every push/PR (PHP 8.3–8.5: `composer validate`, Pint, Pest) and Dependabot opens weekly dependency PRs.
+Companion admin UI: [`adaa/shipping-filament`](https://github.com/AdaaSystem/shipping-filament) (optional Filament resources + dashboard).
 
 ## Contributing
 
-Open source (MIT). Please: a test for every change, Pint before any PR, and never declare an unsupported operation — verify against the carrier's actual API and mark the evidence.
-
-## Credits
-
-Design inspired by [ShipBridge](https://github.com/mohamedhekal/shipbridge) (DTOs, status normalization, Client/PayloadFactory/Driver pattern) and [verbb/shippy](https://github.com/verbb/shippy) (natural multi-account design, comparative rates). Carrier mappings cross-checked against the most-adopted open-source SDKs per carrier (e.g. `octw/aramex`, `korbeil/dhl-express-php-api`, `WhatArmy/FedexRest`, UPS OpenAPI).
+MIT. One rule: a test for every change, Pint before PRs, and never declare an operation a carrier does not support — verify against the real API and note the evidence.
 
 ## License
 
